@@ -1,81 +1,15 @@
-To achieve this, you'll need to follow these steps:
+To add a "Create Claim" button, you can extend the Thymeleaf template with a form that will handle the creation of new claims. Here’s how you can do it:
 
-1. **Set Up Your Entity Class**: Define your `Claim` entity class with fields `claimId`, `cptCode`, `serviceCode`, `charges`, `status`, and `providerName`.
+### 1. Update the Controller
 
-2. **Create a Repository Interface**: Use Spring Data JPA to interact with your database.
-
-3. **Create a Service Layer**: Implement business logic to update the status of claims.
-
-4. **Create a Controller**: Handle HTTP requests and pass data to the Thymeleaf templates.
-
-5. **Design Thymeleaf Templates**: Create HTML forms with buttons for approving or declining claims.
-
-Here’s a basic example of how you can set this up:
-
-### 1. Entity Class
+Add methods to display a form for creating a new claim and handle the submission of that form.
 
 ```java
-import javax.persistence.Entity;
-import javax.persistence.Id;
-
-@Entity
-public class Claim {
-    @Id
-    private Long claimId;
-    private String cptCode;
-    private String serviceCode;
-    private Double charges;
-    private String status;
-    private String providerName;
-
-    // Getters and Setters
-}
-```
-
-### 2. Repository Interface
-
-```java
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface ClaimRepository extends JpaRepository<Claim, Long> {
-}
-```
-
-### 3. Service Layer
-
-```java
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-@Service
-public class ClaimService {
-
-    @Autowired
-    private ClaimRepository claimRepository;
-
-    public Claim getClaimById(Long id) {
-        return claimRepository.findById(id).orElse(null);
-    }
-
-    public void updateClaimStatus(Long id, String status) {
-        Claim claim = getClaimById(id);
-        if (claim != null) {
-            claim.setStatus(status);
-            claimRepository.save(claim);
-        }
-    }
-}
-```
-
-### 4. Controller
-
-```java
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class ClaimController {
@@ -89,17 +23,35 @@ public class ClaimController {
         return "claims";
     }
 
-    @PostMapping("/updateStatus")
-    public String updateStatus(@RequestParam Long claimId, @RequestParam String status) {
-        claimService.updateClaimStatus(claimId, status);
-        return "redirect:/claims";
+    @GetMapping("/createClaim")
+    public String showCreateClaimForm(Model model) {
+        model.addAttribute("claim", new Claim()); // Empty claim object for the form
+        return "createClaim";
+    }
+
+    @PostMapping("/createClaim")
+    public String createClaim(@ModelAttribute Claim claim) {
+        claimService.saveClaim(claim); // Save the new claim
+        return "redirect:/claims"; // Redirect to the claims list
     }
 }
 ```
 
-### 5. Thymeleaf Templates
+### 2. Update the Service
 
-**`claims.html`**
+Add a method in your service layer to save a new claim:
+
+```java
+public void saveClaim(Claim claim) {
+    claimRepository.save(claim);
+}
+```
+
+### 3. Thymeleaf Templates
+
+#### **`claims.html`**
+
+Add a "Create Claim" button at the top of your claims list page, which redirects to the form page.
 
 ```html
 <!DOCTYPE html>
@@ -109,6 +61,11 @@ public class ClaimController {
 </head>
 <body>
     <h1>Claims</h1>
+    
+    <a href="/createClaim">
+        <button>Create Claim</button>
+    </a>
+
     <table>
         <thead>
             <tr>
@@ -143,4 +100,50 @@ public class ClaimController {
 </html>
 ```
 
-This setup includes basic CRUD functionality for the `Claim` entity and allows you to update the claim's status using Thymeleaf forms. Make sure you customize it further according to your specific requirements.
+#### **`createClaim.html`**
+
+This form will be used to create a new claim.
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Create Claim</title>
+</head>
+<body>
+    <h1>Create Claim</h1>
+    <form th:action="@{/createClaim}" th:object="${claim}" method="post">
+        <label for="cptCode">CPT Code:</label>
+        <input type="text" id="cptCode" th:field="*{cptCode}" required><br>
+        
+        <label for="serviceCode">Service Code:</label>
+        <input type="text" id="serviceCode" th:field="*{serviceCode}" required><br>
+        
+        <label for="charges">Charges:</label>
+        <input type="number" id="charges" th:field="*{charges}" required><br>
+        
+        <label for="status">Status:</label>
+        <input type="text" id="status" th:field="*{status}" required><br>
+        
+        <label for="providerName">Provider Name:</label>
+        <input type="text" id="providerName" th:field="*{providerName}" required><br>
+        
+        <button type="submit">Create Claim</button>
+    </form>
+</body>
+</html>
+```
+
+### 4. Updating the Service to Handle Saving Claims
+
+Ensure that your `ClaimService` contains a method to save a claim, which you've already added:
+
+```java
+public void saveClaim(Claim claim) {
+    claimRepository.save(claim);
+}
+```
+
+### Result:
+- When the user clicks "Create Claim", they'll be redirected to a form page to fill in details for a new claim.
+- Upon submitting, the new claim will be saved, and the user will be redirected to the claims list page.

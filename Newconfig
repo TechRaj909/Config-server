@@ -1,0 +1,89 @@
+. Security Configuration using SecurityFilterChainInstead of extending WebSecurityConfigurerAdapter, you will define a SecurityFilterChain bean to configure security.import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable()) // Disable CSRF for simplicity, you might want to enable it in a real application
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/register", "/login", "/h2-console/**").permitAll() // Permit these URLs without authentication
+                .anyRequest().authenticated() // All other requests require authentication
+            )
+            .formLogin(form -> form
+                .loginPage("/login") // Custom login page
+                .defaultSuccessUrl("/dashboard", true) // Redirect to dashboard upon successful login
+                .permitAll()
+            )
+            .logout(logout -> logout
+                .logoutSuccessUrl("/login?logout")
+                .permitAll()
+            );
+        
+        // Enable H2 Console frames (if needed, for development purposes)
+        http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}2. Explanation of the ConfigurationSecurityFilterChain: Defines the main security configuration.authorizeHttpRequests: Replaces the deprecated antMatchers() and defines which requests are permitted without authentication.requestMatchers("/register", "/login", "/h2-console/**").permitAll(): Allows public access to the registration and login pages, as well as the H2 console for testing (if applicable).anyRequest().authenticated(): Ensures that all other pages are only accessible after the user is authenticated.formLogin: Configures form-based login.loginPage("/login"): Specifies a custom login page.defaultSuccessUrl("/dashboard", true): Redirects users to the dashboard page after a successful login.csrf.disable(): Disables CSRF protection for simplicity (not recommended in production without additional security measures).logoutSuccessUrl("/login?logout"): Redirects users to the login page after logging out.3. Custom UserDetailsService for AuthenticationYou will also need a UserDetailsService to load user-specific data. Here's how you can implement it:import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+@Service
+public class CustomUserDetailsService implements UserDetailsService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new UsernameNotFoundException("User not found");
+        }
+        return new org.springframework.security.core.userdetails.User(
+                user.getUsername(),
+                user.getPassword(),
+                Collections.singleton(new SimpleGrantedAuthority(user.getRole()))
+        );
+    }
+}4. Register Your Custom UserDetailsServiceTo wire in your custom UserDetailsService, you can use the following configuration in SecurityConfig:import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.context.annotation.Bean;
+
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        // You can configure in-memory users for testing
+        UserDetails user = User.withUsername("user")
+                               .password(passwordEncoder().encode("password"))
+                               .roles("USER")
+                               .build();
+        return new InMemoryUserDetailsManager(user);
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    // SecurityFilterChain method here (as shown above)
+}5. Spring Boot VersionEnsure you're using Spring Boot version 2.7.x or later, where the SecurityFilterChain and authorizeHttpRequests() methods are fully supported.6. Login and Logout FormsUse the same Thymeleaf templates for login and registration as mentioned in the previous sections.

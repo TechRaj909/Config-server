@@ -1,0 +1,146 @@
+To achieve this, you'll need to follow these steps:
+
+1. **Set Up Your Entity Class**: Define your `Claim` entity class with fields `claimId`, `cptCode`, `serviceCode`, `charges`, `status`, and `providerName`.
+
+2. **Create a Repository Interface**: Use Spring Data JPA to interact with your database.
+
+3. **Create a Service Layer**: Implement business logic to update the status of claims.
+
+4. **Create a Controller**: Handle HTTP requests and pass data to the Thymeleaf templates.
+
+5. **Design Thymeleaf Templates**: Create HTML forms with buttons for approving or declining claims.
+
+Here’s a basic example of how you can set this up:
+
+### 1. Entity Class
+
+```java
+import javax.persistence.Entity;
+import javax.persistence.Id;
+
+@Entity
+public class Claim {
+    @Id
+    private Long claimId;
+    private String cptCode;
+    private String serviceCode;
+    private Double charges;
+    private String status;
+    private String providerName;
+
+    // Getters and Setters
+}
+```
+
+### 2. Repository Interface
+
+```java
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ClaimRepository extends JpaRepository<Claim, Long> {
+}
+```
+
+### 3. Service Layer
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ClaimService {
+
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    public Claim getClaimById(Long id) {
+        return claimRepository.findById(id).orElse(null);
+    }
+
+    public void updateClaimStatus(Long id, String status) {
+        Claim claim = getClaimById(id);
+        if (claim != null) {
+            claim.setStatus(status);
+            claimRepository.save(claim);
+        }
+    }
+}
+```
+
+### 4. Controller
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@Controller
+public class ClaimController {
+
+    @Autowired
+    private ClaimService claimService;
+
+    @GetMapping("/claims")
+    public String viewClaims(Model model) {
+        model.addAttribute("claims", claimService.getAllClaims());
+        return "claims";
+    }
+
+    @PostMapping("/updateStatus")
+    public String updateStatus(@RequestParam Long claimId, @RequestParam String status) {
+        claimService.updateClaimStatus(claimId, status);
+        return "redirect:/claims";
+    }
+}
+```
+
+### 5. Thymeleaf Templates
+
+**`claims.html`**
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Claims</title>
+</head>
+<body>
+    <h1>Claims</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Claim ID</th>
+                <th>CPT Code</th>
+                <th>Service Code</th>
+                <th>Charges</th>
+                <th>Status</th>
+                <th>Provider Name</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="claim : ${claims}">
+                <td th:text="${claim.claimId}"></td>
+                <td th:text="${claim.cptCode}"></td>
+                <td th:text="${claim.serviceCode}"></td>
+                <td th:text="${claim.charges}"></td>
+                <td th:text="${claim.status}"></td>
+                <td th:text="${claim.providerName}"></td>
+                <td>
+                    <form th:action="@{/updateStatus}" method="post">
+                        <input type="hidden" name="claimId" th:value="${claim.claimId}" />
+                        <button type="submit" name="status" value="Approved">Approve</button>
+                        <button type="submit" name="status" value="Declined">Decline</button>
+                    </form>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
+```
+
+This setup includes basic CRUD functionality for the `Claim` entity and allows you to update the claim's status using Thymeleaf forms. Make sure you customize it further according to your specific requirements.
